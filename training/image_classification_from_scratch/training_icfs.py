@@ -106,6 +106,7 @@ for images, labels in train_ds.take(1):
         plt.imshow(images[i].numpy().astype("uint8"))
         plt.title(int(labels[i]))
         plt.axis("off")
+# plt.show()
 
 """
 ## Using image data augmentation
@@ -135,6 +136,7 @@ for images, _ in train_ds.take(1):
         ax = plt.subplot(3, 3, i + 1)
         plt.imshow(augmented_images[0].numpy().astype("uint8"))
         plt.axis("off")
+# plt.show()
 
 """
 ## Standardizing the data
@@ -196,7 +198,6 @@ Note that:
 - We include a `Dropout` layer before the final classification layer.
 """
 
-
 def make_model(input_shape, num_classes):
     inputs = keras.Input(shape=input_shape)
     # Image augmentation block
@@ -247,7 +248,6 @@ def make_model(input_shape, num_classes):
     x = layers.Dropout(0.5)(x)
     outputs = layers.Dense(units, activation=activation)(x)
     return keras.Model(inputs, outputs)
-
 
 model = make_model(input_shape=image_size + (3,), num_classes=2)
 # keras.utils.plot_model(model, show_shapes=True)
