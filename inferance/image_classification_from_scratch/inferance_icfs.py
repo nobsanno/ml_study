@@ -16,8 +16,7 @@ img = keras.preprocessing.image.load_img(
 img_array = keras.preprocessing.image.img_to_array(img)
 img_array = tf.expand_dims(img_array, 0)  # Create batch axis
 
-modelfile = '../../training/image_classification_from_scratch/save_at_1.h5'
-# modelfile = '../../training/image_classification_from_scratch/model_of_image_classification_for_dog_and_cat.h5'
+modelfile = '../../training/image_classification_from_scratch/model_of_image_classification_for_dog_and_cat.h5'
 model = load_model(modelfile)
 predictions = model.predict(img_array)
 score = predictions[0]
