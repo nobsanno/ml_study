@@ -1,21 +1,20 @@
+from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import load_model
 
-modelfile = '../../training/image_classification_from_scratch/model_of_image_classification_for_dog_and_cat.h5'
-model = load_model(modelfile)
+opts = {}
+def parseOptions():
+    argparser = ArgumentParser()
+    argparser.add_argument('--img', help=':specify image file path') # use action='store_true' as flag
+    args = argparser.parse_args()
+    global opts
+    if args.img: opts.update({'img':args.img})
 
-imgfile = "../../training/image_classification_from_scratch/PetImages/Dog/0.jpg"
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Dog/1000.jpg"
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Dog/6779.jpg"
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Dog/12499.jpg"
-
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Cat/0.jpg"
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Cat/1000.jpg"
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Cat/6779.jpg"
-#imgfile = "../../training/image_classification_from_scratch/PetImages/Cat/12499.jpg"
+parseOptions()
+imgfile = opts['img']
 
 image_size = (180, 180)
 img = keras.preprocessing.image.load_img(
@@ -24,6 +23,8 @@ img = keras.preprocessing.image.load_img(
 img_array = keras.preprocessing.image.img_to_array(img)
 img_array = tf.expand_dims(img_array, 0)  # Create batch axis
 
+modelfile = '../../training/image_classification_from_scratch/model_of_image_classification_for_dog_and_cat.h5'
+model = load_model(modelfile)
 predictions = model.predict(img_array)
 score = predictions[0]
 
