@@ -1,9 +1,9 @@
 from argparse import ArgumentParser
+import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import load_model
-import numpy as np
-import matplotlib.pyplot as plt
 
 opts = {}
 def parseOptions():
@@ -14,31 +14,6 @@ def parseOptions():
     global opts
     if args.img: opts.update({'img':args.img})
     if args.mdl: opts.update({'mdl':args.mdl})
-
-parseOptions()
-imgfile = opts['img']
-modelfile = opts['mdl']
-
-# image_size = (180, 180)
-image_size = (150, 150)
-img = keras.preprocessing.image.load_img(
-    imgfile, target_size=image_size
-)
-img_array = keras.preprocessing.image.img_to_array(img)
-img_array = tf.expand_dims(img_array, 0)  # Create batch axis
-
-model = load_model(modelfile)
-model.summary()
-predictions = model.predict(img_array)
-print(f"{predictions}")
-score = predictions[0]
-
-classes = list(range(0))
-if ((100 * score) >= 50):
-    classes.append('dog')
-else:
-    classes.append('cat')
-    score = (1 - score)
 
 # """
 # ## Implementing Anchor generator
@@ -221,8 +196,6 @@ else:
 #             clip_boxes=False,
 #         )
 
-# detections = DecodePredictions(confidence_threshold=0.5)(img_array, predictions)
-
 def visualize_detections(
     image, boxes, classes, scores, figsize=(7, 7), linewidth=1, color=[0, 0, 1]
 ):
@@ -252,10 +225,38 @@ def visualize_detections(
     plt.show()
     return ax
 
-image = plt.imread(imgfile)
-visualize_detections(
-    image,
-    [[10, 10, 110, 110]],
-    classes,
-    score,
-)
+parseOptions()
+if (opts['img'] and opts['mdl']):
+    imgfile = opts['img']
+    modelfile = opts['mdl']
+
+    # image_size = (180, 180)
+    image_size = (150, 150)
+    img = keras.preprocessing.image.load_img(
+        imgfile, target_size=image_size
+    )
+    img_array = keras.preprocessing.image.img_to_array(img)
+    img_array = tf.expand_dims(img_array, 0)  # Create batch axis
+
+    model = load_model(modelfile)
+    model.summary()
+    predictions = model.predict(img_array)
+    print(f"{predictions}")
+    score = predictions[0]
+
+    classes = list(range(0))
+    if ((100 * score) >= 50):
+        classes.append('dog')
+    else:
+        classes.append('cat')
+        score = (1 - score)
+
+    # detections = DecodePredictions(confidence_threshold=0.5)(img_array, predictions)
+
+    image = plt.imread(imgfile)
+    visualize_detections(
+        image,
+        [[10, 10, 110, 110]],
+        classes,
+        score,
+    )
