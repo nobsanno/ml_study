@@ -2,11 +2,8 @@
 
 Three directry are available.
 
-- common files are stored.
-common/
+- plane model generate programs are stored in "common/".
 
-- training probrams are stored. however, data are not available.
-training/
+- training programs are stored in "training/".
 
-- inferance programs are stored.
-inferance/
+- inferance programs are stored in "inferance/"
