@@ -2,7 +2,7 @@
 
 Three directry are available.
 
-- plane model generate programs are stored in "common/".
+- plane model generate programs are stored in "modeling/".
 
 - training programs are stored in "training/".
 
