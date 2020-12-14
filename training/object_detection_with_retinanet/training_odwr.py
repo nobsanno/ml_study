@@ -4,6 +4,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import tensorflow_datasets as tfds
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 import sys
 import zipfile
@@ -14,10 +15,14 @@ opts = {}
 def parseOptions():
     argparser = ArgumentParser()
     argparser.add_argument('--prp', help=':preparing data set', action='store_true') # use action='store_true' as flag
-    argparser.add_argument('--wmn', help=':specify write model name') # use action='store_true' as flag
+    argparser.add_argument('--trg', help=':training', action='store_true') # use action='store_true' as flag
+    argparser.add_argument('--inf', help=':inferance', action='store_true') # use action='store_true' as flag
+    argparser.add_argument('--img', help=':specify image file path') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.prp: opts.update({'prp':args.prp})
-    if args.wmn: opts.update({'wmn':args.wmn})
+    if args.trg: opts.update({'trg':args.trg})
+    if args.inf: opts.update({'inf':args.inf})
+    if args.img: opts.update({'img':args.img})
 
 num_classes = 80
 learning_rate_boundaries = [125, 250, 500, 240000, 360000]
@@ -629,24 +634,105 @@ def preprocess_data(sample):
     bbox = convert_to_xywh(bbox)
     return image, bbox, class_id
 
-parseOptions()
+class DecodePredictions(tf.keras.layers.Layer):
+    """A Keras layer that decodes predictions of the RetinaNet model.
+    Attributes:
+      num_classes: Number of classes in the dataset
+      confidence_threshold: Minimum class probability, below which detections
+        are pruned.
+      nms_iou_threshold: IOU threshold for the NMS operation
+      max_detections_per_class: Maximum number of detections to retain per
+       class.
+      max_detections: Maximum number of detections to retain across all
+        classes.
+      box_variance: The scaling factors used to scale the bounding box
+        predictions.
+    """
 
-"""
-## Downloading the COCO2017 dataset
-Training on the entire COCO2017 dataset which has around 118k images takes a
-lot of time, hence we will be using a smaller subset of ~500 images for
-training in this example.
-"""
+    def __init__(
+        self,
+        num_classes=80,
+        confidence_threshold=0.05,
+        nms_iou_threshold=0.5,
+        max_detections_per_class=100,
+        max_detections=100,
+        box_variance=[0.1, 0.1, 0.2, 0.2],
+        **kwargs
+    ):
+        super(DecodePredictions, self).__init__(**kwargs)
+        self.num_classes = num_classes
+        self.confidence_threshold = confidence_threshold
+        self.nms_iou_threshold = nms_iou_threshold
+        self.max_detections_per_class = max_detections_per_class
+        self.max_detections = max_detections
 
-if ('prp' in opts.keys()):
-    url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
-    filename = os.path.join(os.getcwd(), "data.zip")
-    # keras.utils.get_file(filename, url)
-    with zipfile.ZipFile("data.zip", "r") as z_fp:
-        z_fp.extractall("./")
+        self._anchor_box = AnchorBox()
+        self._box_variance = tf.convert_to_tensor(
+            [0.1, 0.1, 0.2, 0.2], dtype=tf.float32
+        )
 
-if (not ('wmn' in opts.keys())):
-    sys.exit()
+    def _decode_box_predictions(self, anchor_boxes, box_predictions):
+        boxes = box_predictions * self._box_variance
+        boxes = tf.concat(
+            [
+                boxes[:, :, :2] * anchor_boxes[:, :, 2:] + anchor_boxes[:, :, :2],
+                tf.math.exp(boxes[:, :, 2:]) * anchor_boxes[:, :, 2:],
+            ],
+            axis=-1,
+        )
+        boxes_transformed = convert_to_corners(boxes)
+        return boxes_transformed
+
+    def call(self, images, predictions):
+        image_shape = tf.cast(tf.shape(images), dtype=tf.float32)
+        anchor_boxes = self._anchor_box.get_anchors(image_shape[1], image_shape[2])
+        box_predictions = predictions[:, :, :4]
+        cls_predictions = tf.nn.sigmoid(predictions[:, :, 4:])
+        boxes = self._decode_box_predictions(anchor_boxes[None, ...], box_predictions)
+
+        return tf.image.combined_non_max_suppression(
+            tf.expand_dims(boxes, axis=2),
+            cls_predictions,
+            self.max_detections_per_class,
+            self.max_detections,
+            self.nms_iou_threshold,
+            self.confidence_threshold,
+            clip_boxes=False,
+        )
+
+def prepare_image(image):
+    image, _, ratio = resize_and_pad_image(image, jitter=None)
+    image = tf.keras.applications.resnet.preprocess_input(image)
+    return tf.expand_dims(image, axis=0), ratio
+
+def visualize_detections(
+    image, boxes, classes, scores, figsize=(7, 7), linewidth=1, color=[1, 0, 0]
+):
+    """Visualize Detections"""
+    image = np.array(image, dtype=np.uint8)
+    plt.figure(figsize=figsize)
+    plt.axis("off")
+    plt.imshow(image)
+    ax = plt.gca()
+    for box, _cls, score in zip(boxes, classes, scores):
+        print(f"predictions={_cls}, {score}")
+        text = "{}: {:.2f}".format(_cls, score)
+        x1, y1, x2, y2 = box
+        w, h = x2 - x1, y2 - y1
+        patch = plt.Rectangle(
+            [x1, y1], w, h, fill=False, edgecolor=color, linewidth=linewidth
+        )
+        ax.add_patch(patch)
+        ax.text(
+            x1,
+            y1,
+            text,
+            bbox={"facecolor": color, "alpha": 0.4},
+            clip_box=ax.clipbox,
+            clip_on=True,
+        )
+    plt.show()
+    return ax
 
 """
 ## Initializing and compiling model
@@ -664,100 +750,200 @@ optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
 
 model.compile(loss=loss_fn, optimizer=optimizer)
 
-"""
-## Load the COCO2017 dataset using TensorFlow Datasets
-"""
-
-#  set `data_dir=None` to load the complete dataset
-
-(train_dataset, val_dataset), dataset_info = tfds.load(
-    "coco/2017", split=["train", "validation"], with_info=True, data_dir=weights_dir
-)
+parseOptions()
 
 """
-## Setting up training parameters
+## Downloading the COCO2017 dataset
+Training on the entire COCO2017 dataset which has around 118k images takes a
+lot of time, hence we will be using a smaller subset of ~500 images for
+training in this example.
 """
 
-label_encoder = LabelEncoder()
+if ('prp' in opts.keys()):
+    url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
+    filename = os.path.join(os.getcwd(), "data.zip")
+    # keras.utils.get_file(filename, url)
+    with zipfile.ZipFile("data.zip", "r") as z_fp:
+        z_fp.extractall("./")
 
-"""
-## Setting up a `tf.data` pipeline
-To ensure that the model is fed with data efficiently we will be using
-`tf.data` API to create our input pipeline. The input pipeline
-consists for the following major processing steps:
-- Apply the preprocessing function to the samples
-- Create batches with fixed batch size. Since images in the batch can
-have different dimensions, and can also have different number of
-objects, we use `padded_batch` to the add the necessary padding to create
-rectangular tensors
-- Create targets for each sample in the batch using `LabelEncoder`
-"""
+if ('trg' in opts.keys()):
+    """
+    ## Load the COCO2017 dataset using TensorFlow Datasets
+    """
 
-autotune = tf.data.experimental.AUTOTUNE
-train_dataset = train_dataset.map(preprocess_data, num_parallel_calls=autotune)
-train_dataset = train_dataset.shuffle(8 * batch_size)
-train_dataset = train_dataset.padded_batch(
-    batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True
-)
-train_dataset = train_dataset.map(
-    label_encoder.encode_batch, num_parallel_calls=autotune
-)
-train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
-train_dataset = train_dataset.prefetch(autotune)
+    #  set `data_dir=None` to load the complete dataset
 
-val_dataset = val_dataset.map(preprocess_data, num_parallel_calls=autotune)
-val_dataset = val_dataset.padded_batch(
-    batch_size=1, padding_values=(0.0, 1e-8, -1), drop_remainder=True
-)
-val_dataset = val_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
-val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
-val_dataset = val_dataset.prefetch(autotune)
+    (train_dataset, val_dataset), dataset_info = tfds.load(
+        "coco/2017", split=["train", "validation"], with_info=True, data_dir=weights_dir
+    )
 
-"""
-## Setting up callbacks
-"""
+    """
+    ## Setting up training parameters
+    """
 
-callbacks_list = [
-    tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(model_dir, "weights" + "_epoch_{epoch}"),
-        monitor="loss",
-        save_best_only=False,
-        save_weights_only=True,
+    label_encoder = LabelEncoder()
+
+    """
+    ## Setting up a `tf.data` pipeline
+    To ensure that the model is fed with data efficiently we will be using
+    `tf.data` API to create our input pipeline. The input pipeline
+    consists for the following major processing steps:
+    - Apply the preprocessing function to the samples
+    - Create batches with fixed batch size. Since images in the batch can
+    have different dimensions, and can also have different number of
+    objects, we use `padded_batch` to the add the necessary padding to create
+    rectangular tensors
+    - Create targets for each sample in the batch using `LabelEncoder`
+    """
+
+    autotune = tf.data.experimental.AUTOTUNE
+    train_dataset = train_dataset.map(preprocess_data, num_parallel_calls=autotune)
+    train_dataset = train_dataset.shuffle(8 * batch_size)
+    train_dataset = train_dataset.padded_batch(
+        batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True
+    )
+    train_dataset = train_dataset.map(
+        label_encoder.encode_batch, num_parallel_calls=autotune
+    )
+    train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
+    train_dataset = train_dataset.prefetch(autotune)
+
+    val_dataset = val_dataset.map(preprocess_data, num_parallel_calls=autotune)
+    val_dataset = val_dataset.padded_batch(
+        batch_size=1, padding_values=(0.0, 1e-8, -1), drop_remainder=True
+    )
+    val_dataset = val_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
+    val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
+    val_dataset = val_dataset.prefetch(autotune)
+
+    """
+    ## Setting up callbacks
+    """
+
+    callbacks_list = [
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=os.path.join(model_dir, "weights" + "_epoch_{epoch}"),
+            monitor="loss",
+            save_best_only=False,
+            save_weights_only=True,
+            verbose=1,
+        )
+    ]
+
+    """
+    ## Training the model
+    """
+
+    # Uncomment the following lines, when training on full dataset
+    # train_steps_per_epoch = dataset_info.splits["train"].num_examples // batch_size
+    # val_steps_per_epoch = \
+    #     dataset_info.splits["validation"].num_examples // batch_size
+
+    # train_steps = 4 * 100000
+    # epochs = train_steps // train_steps_per_epoch
+
+    # Running 100 training and 50 validation steps,
+    # remove `.take` when training on the full dataset
+
+    model.fit(
+        train_dataset.take(100),
+        validation_data=val_dataset.take(50),
+        epochs=epochs,
+        callbacks=callbacks_list,
         verbose=1,
     )
-]
 
-"""
-## Training the model
-"""
+if ('inf' in opts.keys()):
+    """
+    ## Loading weights
+    """
 
-# Uncomment the following lines, when training on full dataset
-# train_steps_per_epoch = dataset_info.splits["train"].num_examples // batch_size
-# val_steps_per_epoch = \
-#     dataset_info.splits["validation"].num_examples // batch_size
+    # Change this to `model_dir` when not using the downloaded weights
 
-# train_steps = 4 * 100000
-# epochs = train_steps // train_steps_per_epoch
+    latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
+    model.load_weights(latest_checkpoint)
 
-# Running 100 training and 50 validation steps,
-# remove `.take` when training on the full dataset
+    """
+    ## Building inference model
+    """
 
-model.fit(
-    train_dataset.take(100),
-    validation_data=val_dataset.take(50),
-    epochs=epochs,
-    callbacks=callbacks_list,
-    verbose=1,
-)
+    image = tf.keras.Input(shape=[None, None, 3], name="image")
+    predictions = model(image, training=False)
+    detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
+    inference_model = tf.keras.Model(inputs=image, outputs=detections)
 
-"""
-## Loading weights
-"""
+    """
+    ## Load the COCO2017 dataset using TensorFlow Datasets
+    """
 
-# Change this to `model_dir` when not using the downloaded weights
+    #  set `data_dir=None` to load the complete dataset
 
-latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
-model.load_weights(latest_checkpoint)
+    val_dataset, dataset_info = tfds.load("coco/2017", split="validation", with_info=True, data_dir=weights_dir)
+    int2str = dataset_info.features["objects"]["label"].int2str
 
-model.summary()
-model.save(opts['wmn'])
+    for sample in val_dataset.take(2):
+        image = tf.cast(sample["image"], dtype=tf.float32)
+        input_image, ratio = prepare_image(image)
+        detections = inference_model.predict(input_image)
+        num_detections = detections.valid_detections[0]
+        class_names = [
+            int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
+        ]
+        visualize_detections(
+            image,
+            detections.nmsed_boxes[0][:num_detections] / ratio,
+            class_names,
+            detections.nmsed_scores[0][:num_detections],
+        )
+
+if ('img' in opts.keys()):
+    imgfile = opts['img']
+
+    """
+    ## Loading weights
+    """
+
+    # Change this to `model_dir` when not using the downloaded weights
+
+    latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
+    model.load_weights(latest_checkpoint)
+
+    """
+    ## Building inference model
+    """
+
+    image = tf.keras.Input(shape=[None, None, 3], name="image")
+    predictions = model(image, training=False)
+    detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
+    inference_model = tf.keras.Model(inputs=image, outputs=detections)
+
+    """
+    ## Load the COCO2017 dataset using TensorFlow Datasets
+    """
+
+    #  set `data_dir=None` to load the complete dataset
+
+    val_dataset, dataset_info = tfds.load("coco/2017", split="validation", with_info=True, data_dir=weights_dir)
+    int2str = dataset_info.features["objects"]["label"].int2str
+
+    image_size = (180, 180)
+    img = keras.preprocessing.image.load_img(
+        # imgfile, target_size=image_size
+        imgfile
+    )
+    img_array = keras.preprocessing.image.img_to_array(img)
+    # img_array = tf.expand_dims(img_array, 0)  # Create batch axis
+
+    image = tf.cast(img_array, dtype=tf.float32)
+    input_image, ratio = prepare_image(image)
+    detections = inference_model.predict(input_image)
+    num_detections = detections.valid_detections[0]
+    class_names = [
+        int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
+    ]
+    visualize_detections(
+        image,
+        detections.nmsed_boxes[0][:num_detections] / ratio,
+        class_names,
+        detections.nmsed_scores[0][:num_detections],
+    )
