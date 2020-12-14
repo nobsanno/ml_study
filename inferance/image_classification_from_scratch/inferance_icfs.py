@@ -5,13 +5,14 @@ from tensorflow.keras.models import load_model
 import numpy as np
 import matplotlib.pyplot as plt
 
+global opts
 opts = {}
+
 def parseOptions():
     argparser = ArgumentParser()
     argparser.add_argument('--mdl', help=':specify model file path') # use action='store_true' as flag
     argparser.add_argument('--img', help=':specify image file path') # use action='store_true' as flag
     args = argparser.parse_args()
-    global opts
     if args.mdl: opts.update({'mdl':args.mdl})
     if args.img: opts.update({'img':args.img})
 
