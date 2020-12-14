@@ -492,6 +492,16 @@ class LabelEncoder:
         batch_images = tf.keras.applications.resnet.preprocess_input(batch_images)
         return batch_images, labels.stack()
 
+"""
+## Implementing utility functions
+Bounding boxes can be represented in multiple ways, the most common formats are:
+- Storing the coordinates of the corners `[xmin, ymin, xmax, ymax]`
+- Storing the coordinates of the center and the box dimensions
+`[x, y, width, height]`
+Since we require both formats, we will be implementing functions for converting
+between the formats.
+"""
+
 def swap_xy(boxes):
     """Swaps order the of x and y coordinates of the boxes.
     Arguments:
