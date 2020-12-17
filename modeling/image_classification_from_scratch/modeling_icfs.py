@@ -135,10 +135,5 @@ def make_model(input_shape, num_classes):
 parseOptions()
 if 'wmn' in opts.keys():
     model = make_model(input_shape=image_size + (3,), num_classes=2)
-    model.compile(
-        optimizer=keras.optimizers.Adam(1e-3),
-        loss="binary_crossentropy",
-        metrics=["accuracy"],
-    )
     model.summary()
     model.save(opts['wmn'])
