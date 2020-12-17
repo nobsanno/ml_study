@@ -125,6 +125,11 @@ callbacks = [
 
 model = load_model(opts['rmn'])
 model.summary()
+model.compile(
+    loss="binary_crossentropy",
+    metrics=["accuracy"],
+    optimizer=keras.optimizers.Adam(1e-3),
+)
 model.fit(
     train_ds, epochs=epochs, callbacks=callbacks, validation_data=val_ds,
 )
