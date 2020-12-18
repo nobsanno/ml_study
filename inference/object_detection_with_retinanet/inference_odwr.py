@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 import tensorflow_datasets as tfds
+from tensorflow.keras.models import load_model
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -17,15 +18,18 @@ def parseOptions():
     argparser = ArgumentParser()
     argparser.add_argument('--prp', help=':preparing data set', action='store_true') # use action='store_true' as flag
     argparser.add_argument('--dat', help=':specify data dir path') # use action='store_true' as flag
+    argparser.add_argument('--mdl', help=':specify model file path') # use action='store_true' as flag
     argparser.add_argument('--img', help=':specify image file path') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.prp: opts.update({'prp':args.prp})
     if args.dat: opts.update({'dat':args.dat})
+    if args.mdl: opts.update({'mdl':args.mdl})
     if args.img: opts.update({'img':args.img})
 
 num_classes = 80
 learning_rate_boundaries = [125, 250, 500, 240000, 360000]
 learning_rates = [2.5e-06, 0.000625, 0.00125, 0.0025, 0.00025, 2.5e-05]
+image_size = (150, 150)
 
 """
 ## Introduction
@@ -432,33 +436,9 @@ def prepare_image(image):
     image = tf.keras.applications.resnet.preprocess_input(image)
     return tf.expand_dims(image, axis=0), ratio
 
-def second_classification(
-    imgfile, boxes, figsize=(7, 7)
-):
-    f = plt.figure(figsize=figsize)
-    n = int(len(boxes))
-    i = 0
-    for box in boxes:
-        image = cv2.imread(imgfile)
-
-        x1, y1, x2, y2 = [int(idx) for idx in box]
-        # print(f"x1={x1}, x2={x2}, y1={y1}, y2={y2}")
-
-        cimage = image[y1:y2, x1:x2]
-        cimage = cv2.cvtColor(cimage, cv2.COLOR_BGR2RGB)
-        cimage = np.array(cimage, dtype=np.uint8)
-
-        f.add_subplot(1, n, i + 1)
-        i = i + 1
-        plt.axis("off")
-        plt.imshow(cimage)
-    
-    plt.show(block=True)
-
 def visualize_detections(
     image, boxes, classes, scores, figsize=(7, 7), linewidth=1, color=[1, 0, 0]
 ):
-    """Visualize Detections"""
     image = np.array(image, dtype=np.uint8)
     plt.figure(figsize=figsize)
     plt.axis("off")
@@ -484,6 +464,46 @@ def visualize_detections(
     plt.show()
     return ax
 
+def second_classification(
+     mdlfile, imgfile, boxes, figsize=(10, 7)
+):
+    model = load_model(mdlfile)
+    model.summary()
+
+    image = cv2.imread(imgfile)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    n = int(len(boxes)) + 1
+    f = plt.figure(figsize=figsize)
+    i = 0
+
+    f.add_subplot(1, n, i + 1)
+    i = i + 1
+    plt.title(777)
+    plt.axis("off")
+    plt.imshow(image)
+
+    for box in boxes:
+
+        x1, y1, x2, y2 = [int(idx) for idx in box]
+        # print(f"x1={x1}, x2={x2}, y1={y1}, y2={y2}")
+
+        cimage = image[y1:y2, x1:x2]
+        rimage = cv2.resize(cimage, image_size)
+
+        img_array = keras.preprocessing.image.img_to_array(rimage)
+        img_array = tf.expand_dims(img_array, 0)  # Create batch axis
+        predictions = model.predict(img_array)
+        # print(predictions)
+
+        f.add_subplot(1, n, i + 1)
+        i = i + 1
+        plt.title(float("{:.5f}".format(predictions[0][0])))
+        plt.axis("off")
+        plt.imshow(cimage)
+    
+    plt.show(block=True)
+
 parseOptions()
 
 if ('prp' in opts.keys()):
@@ -500,8 +520,9 @@ if ('prp' in opts.keys()):
     with zipfile.ZipFile("data.zip", "r") as z_fp:
         z_fp.extractall("./")
 
-if ('dat' in opts.keys() and 'img' in opts.keys()):
+if ('dat' in opts.keys() and 'mdl' in opts.keys() and 'img' in opts.keys()):
     datadir = opts['dat']
+    mdlfile = opts['mdl']
     imgfile = opts['img']
 
     """
@@ -556,21 +577,23 @@ if ('dat' in opts.keys() and 'img' in opts.keys()):
     class_names = [ int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections] ]
 
     """
+    ## Visualize of Object detection
+    """
+
+    # visualize_detections(
+    #     image,
+    #     detections.nmsed_boxes[0][:num_detections] / ratio,
+    #     class_names,
+    #     detections.nmsed_scores[0][:num_detections],
+    # )
+
+    """
     ## Second classification
     """
 
     second_classification(
+        mdlfile,
         imgfile,
         detections.nmsed_boxes[0][:num_detections] / ratio,
     )
 
-    """
-    ## Visualize
-    """
-
-    visualize_detections(
-        image,
-        detections.nmsed_boxes[0][:num_detections] / ratio,
-        class_names,
-        detections.nmsed_scores[0][:num_detections],
-    )
