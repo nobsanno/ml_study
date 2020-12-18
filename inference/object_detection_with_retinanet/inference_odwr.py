@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import os
 import sys
 import zipfile
+import cv2
 
 global opts
 opts = {}
@@ -174,81 +175,6 @@ class RetinaNet(keras.Model):
         return tf.concat([box_outputs, cls_outputs], axis=-1)
 
 """
-## Implementing Smooth L1 loss and Focal Loss as keras custom losses
-"""
-
-class RetinaNetBoxLoss(tf.losses.Loss):
-    """Implements Smooth L1 loss"""
-
-    def __init__(self, delta):
-        super(RetinaNetBoxLoss, self).__init__(
-            reduction="none", name="RetinaNetBoxLoss"
-        )
-        self._delta = delta
-
-    def call(self, y_true, y_pred):
-        difference = y_true - y_pred
-        absolute_difference = tf.abs(difference)
-        squared_difference = difference ** 2
-        loss = tf.where(
-            tf.less(absolute_difference, self._delta),
-            0.5 * squared_difference,
-            absolute_difference - 0.5,
-        )
-        return tf.reduce_sum(loss, axis=-1)
-
-class RetinaNetClassificationLoss(tf.losses.Loss):
-    """Implements Focal loss"""
-
-    def __init__(self, alpha, gamma):
-        super(RetinaNetClassificationLoss, self).__init__(
-            reduction="none", name="RetinaNetClassificationLoss"
-        )
-        self._alpha = alpha
-        self._gamma = gamma
-
-    def call(self, y_true, y_pred):
-        cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=y_true, logits=y_pred
-        )
-        probs = tf.nn.sigmoid(y_pred)
-        alpha = tf.where(tf.equal(y_true, 1.0), self._alpha, (1.0 - self._alpha))
-        pt = tf.where(tf.equal(y_true, 1.0), probs, 1 - probs)
-        loss = alpha * tf.pow(1.0 - pt, self._gamma) * cross_entropy
-        return tf.reduce_sum(loss, axis=-1)
-
-class RetinaNetLoss(tf.losses.Loss):
-    """Wrapper to combine both the losses"""
-
-    def __init__(self, num_classes=80, alpha=0.25, gamma=2.0, delta=1.0):
-        super(RetinaNetLoss, self).__init__(reduction="auto", name="RetinaNetLoss")
-        self._clf_loss = RetinaNetClassificationLoss(alpha, gamma)
-        self._box_loss = RetinaNetBoxLoss(delta)
-        self._num_classes = num_classes
-
-    def call(self, y_true, y_pred):
-        y_pred = tf.cast(y_pred, dtype=tf.float32)
-        box_labels = y_true[:, :, :4]
-        box_predictions = y_pred[:, :, :4]
-        cls_labels = tf.one_hot(
-            tf.cast(y_true[:, :, 4], dtype=tf.int32),
-            depth=self._num_classes,
-            dtype=tf.float32,
-        )
-        cls_predictions = y_pred[:, :, 4:]
-        positive_mask = tf.cast(tf.greater(y_true[:, :, 4], -1.0), dtype=tf.float32)
-        ignore_mask = tf.cast(tf.equal(y_true[:, :, 4], -2.0), dtype=tf.float32)
-        clf_loss = self._clf_loss(cls_labels, cls_predictions)
-        box_loss = self._box_loss(box_labels, box_predictions)
-        clf_loss = tf.where(tf.equal(ignore_mask, 1.0), 0.0, clf_loss)
-        box_loss = tf.where(tf.equal(positive_mask, 1.0), box_loss, 0.0)
-        normalizer = tf.reduce_sum(positive_mask, axis=-1)
-        clf_loss = tf.math.divide_no_nan(tf.reduce_sum(clf_loss, axis=-1), normalizer)
-        box_loss = tf.math.divide_no_nan(tf.reduce_sum(box_loss, axis=-1), normalizer)
-        loss = clf_loss + box_loss
-        return loss
-
-"""
 ## Implementing Anchor generator
 Anchor boxes are fixed sized boxes that the model uses to predict the bounding
 box for an object. It does this by regressing the offset between the location
@@ -346,39 +272,6 @@ class AnchorBox:
         return tf.concat(anchors, axis=0)
 
 """
-## Computing pairwise Intersection Over Union (IOU)
-As we will see later in the example, we would be assigning ground truth boxes
-to anchor boxes based on the extent of overlapping. This will require us to
-calculate the Intersection Over Union (IOU) between all the anchor
-boxes and ground truth boxes pairs.
-"""
-
-def compute_iou(boxes1, boxes2):
-    """Computes pairwise IOU matrix for given two sets of boxes
-    Arguments:
-      boxes1: A tensor with shape `(N, 4)` representing bounding boxes
-        where each box is of the format `[x, y, width, height]`.
-        boxes2: A tensor with shape `(M, 4)` representing bounding boxes
-        where each box is of the format `[x, y, width, height]`.
-    Returns:
-      pairwise IOU matrix with shape `(N, M)`, where the value at ith row
-        jth column holds the IOU between ith box and jth box from
-        boxes1 and boxes2 respectively.
-    """
-    boxes1_corners = convert_to_corners(boxes1)
-    boxes2_corners = convert_to_corners(boxes2)
-    lu = tf.maximum(boxes1_corners[:, None, :2], boxes2_corners[:, :2])
-    rd = tf.minimum(boxes1_corners[:, None, 2:], boxes2_corners[:, 2:])
-    intersection = tf.maximum(0.0, rd - lu)
-    intersection_area = intersection[:, :, 0] * intersection[:, :, 1]
-    boxes1_area = boxes1[:, 2] * boxes1[:, 3]
-    boxes2_area = boxes2[:, 2] * boxes2[:, 3]
-    union_area = tf.maximum(
-        boxes1_area[:, None] + boxes2_area - intersection_area, 1e-8
-    )
-    return tf.clip_by_value(intersection_area / union_area, 0.0, 1.0)
-
-"""
 ## Implementing utility functions
 Bounding boxes can be represented in multiple ways, the most common formats are:
 - Storing the coordinates of the corners `[xmin, ymin, xmax, ymax]`
@@ -424,96 +317,6 @@ def convert_to_corners(boxes):
         [boxes[..., :2] - boxes[..., 2:] / 2.0, boxes[..., :2] + boxes[..., 2:] / 2.0],
         axis=-1,
     )
-
-def random_flip_horizontal(image, boxes):
-    """Flips image and boxes horizontally with 50% chance
-    Arguments:
-      image: A 3-D tensor of shape `(height, width, channels)` representing an
-        image.
-      boxes: A tensor with shape `(num_boxes, 4)` representing bounding boxes,
-        having normalized coordinates.
-    Returns:
-      Randomly flipped image and boxes
-    """
-    if tf.random.uniform(()) > 0.5:
-        image = tf.image.flip_left_right(image)
-        boxes = tf.stack(
-            [1 - boxes[:, 2], boxes[:, 1], 1 - boxes[:, 0], boxes[:, 3]], axis=-1
-        )
-    return image, boxes
-
-def resize_and_pad_image(
-    image, min_side=800.0, max_side=1333.0, jitter=[640, 1024], stride=128.0
-):
-    """Resizes and pads image while preserving aspect ratio.
-    1. Resizes images so that the shorter side is equal to `min_side`
-    2. If the longer side is greater than `max_side`, then resize the image
-      with longer side equal to `max_side`
-    3. Pad with zeros on right and bottom to make the image shape divisible by
-    `stride`
-    Arguments:
-      image: A 3-D tensor of shape `(height, width, channels)` representing an
-        image.
-      min_side: The shorter side of the image is resized to this value, if
-        `jitter` is set to None.
-      max_side: If the longer side of the image exceeds this value after
-        resizing, the image is resized such that the longer side now equals to
-        this value.
-      jitter: A list of floats containing minimum and maximum size for scale
-        jittering. If available, the shorter side of the image will be
-        resized to a random value in this range.
-      stride: The stride of the smallest feature map in the feature pyramid.
-        Can be calculated using `image_size / feature_map_size`.
-    Returns:
-      image: Resized and padded image.
-      image_shape: Shape of the image before padding.
-      ratio: The scaling factor used to resize the image
-    """
-    image_shape = tf.cast(tf.shape(image)[:2], dtype=tf.float32)
-    if jitter is not None:
-        min_side = tf.random.uniform((), jitter[0], jitter[1], dtype=tf.float32)
-    ratio = min_side / tf.reduce_min(image_shape)
-    if ratio * tf.reduce_max(image_shape) > max_side:
-        ratio = max_side / tf.reduce_max(image_shape)
-    image_shape = ratio * image_shape
-    image = tf.image.resize(image, tf.cast(image_shape, dtype=tf.int32))
-    padded_image_shape = tf.cast(
-        tf.math.ceil(image_shape / stride) * stride, dtype=tf.int32
-    )
-    image = tf.image.pad_to_bounding_box(
-        image, 0, 0, padded_image_shape[0], padded_image_shape[1]
-    )
-    return image, image_shape, ratio
-
-def preprocess_data(sample):
-    """Applies preprocessing step to a single sample
-    Arguments:
-      sample: A dict representing a single training sample.
-    Returns:
-      image: Resized and padded image with random horizontal flipping applied.
-      bbox: Bounding boxes with the shape `(num_objects, 4)` where each box is
-        of the format `[x, y, width, height]`.
-      class_id: An tensor representing the class id of the objects, having
-        shape `(num_objects,)`.
-    """
-    image = sample["image"]
-    bbox = swap_xy(sample["objects"]["bbox"])
-    class_id = tf.cast(sample["objects"]["label"], dtype=tf.int32)
-
-    image, bbox = random_flip_horizontal(image, bbox)
-    image, image_shape, _ = resize_and_pad_image(image)
-
-    bbox = tf.stack(
-        [
-            bbox[:, 0] * image_shape[1],
-            bbox[:, 1] * image_shape[0],
-            bbox[:, 2] * image_shape[1],
-            bbox[:, 3] * image_shape[0],
-        ],
-        axis=-1,
-    )
-    bbox = convert_to_xywh(bbox)
-    return image, bbox, class_id
 
 class DecodePredictions(tf.keras.layers.Layer):
     """A Keras layer that decodes predictions of the RetinaNet model.
@@ -581,10 +384,76 @@ class DecodePredictions(tf.keras.layers.Layer):
             clip_boxes=False,
         )
 
+def resize_and_pad_image(
+    image, min_side=800.0, max_side=1333.0, jitter=[640, 1024], stride=128.0
+):
+    """Resizes and pads image while preserving aspect ratio.
+    1. Resizes images so that the shorter side is equal to `min_side`
+    2. If the longer side is greater than `max_side`, then resize the image
+      with longer side equal to `max_side`
+    3. Pad with zeros on right and bottom to make the image shape divisible by
+    `stride`
+    Arguments:
+      image: A 3-D tensor of shape `(height, width, channels)` representing an
+        image.
+      min_side: The shorter side of the image is resized to this value, if
+        `jitter` is set to None.
+      max_side: If the longer side of the image exceeds this value after
+        resizing, the image is resized such that the longer side now equals to
+        this value.
+      jitter: A list of floats containing minimum and maximum size for scale
+        jittering. If available, the shorter side of the image will be
+        resized to a random value in this range.
+      stride: The stride of the smallest feature map in the feature pyramid.
+        Can be calculated using `image_size / feature_map_size`.
+    Returns:
+      image: Resized and padded image.
+      image_shape: Shape of the image before padding.
+      ratio: The scaling factor used to resize the image
+    """
+    image_shape = tf.cast(tf.shape(image)[:2], dtype=tf.float32)
+    if jitter is not None:
+        min_side = tf.random.uniform((), jitter[0], jitter[1], dtype=tf.float32)
+    ratio = min_side / tf.reduce_min(image_shape)
+    if ratio * tf.reduce_max(image_shape) > max_side:
+        ratio = max_side / tf.reduce_max(image_shape)
+    image_shape = ratio * image_shape
+    image = tf.image.resize(image, tf.cast(image_shape, dtype=tf.int32))
+    padded_image_shape = tf.cast(
+        tf.math.ceil(image_shape / stride) * stride, dtype=tf.int32
+    )
+    image = tf.image.pad_to_bounding_box(
+        image, 0, 0, padded_image_shape[0], padded_image_shape[1]
+    )
+    return image, image_shape, ratio
+
 def prepare_image(image):
     image, _, ratio = resize_and_pad_image(image, jitter=None)
     image = tf.keras.applications.resnet.preprocess_input(image)
     return tf.expand_dims(image, axis=0), ratio
+
+def second_classification(
+    imgfile, boxes, figsize=(7, 7)
+):
+    f = plt.figure(figsize=figsize)
+    n = int(len(boxes))
+    i = 0
+    for box in boxes:
+        image = cv2.imread(imgfile)
+
+        x1, y1, x2, y2 = [int(idx) for idx in box]
+        # print(f"x1={x1}, x2={x2}, y1={y1}, y2={y2}")
+
+        cimage = image[y1:y2, x1:x2]
+        cimage = cv2.cvtColor(cimage, cv2.COLOR_BGR2RGB)
+        cimage = np.array(cimage, dtype=np.uint8)
+
+        f.add_subplot(1, n, i + 1)
+        i = i + 1
+        plt.axis("off")
+        plt.imshow(cimage)
+    
+    plt.show(block=True)
 
 def visualize_detections(
     image, boxes, classes, scores, figsize=(7, 7), linewidth=1, color=[1, 0, 0]
@@ -627,29 +496,20 @@ if ('prp' in opts.keys()):
 
     url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
     filename = os.path.join(os.getcwd(), "data.zip")
-    # keras.utils.get_file(filename, url)
+    keras.utils.get_file(filename, url)
     with zipfile.ZipFile("data.zip", "r") as z_fp:
         z_fp.extractall("./")
 
-if ('img' in opts.keys()):
+if ('dat' in opts.keys() and 'img' in opts.keys()):
     datadir = opts['dat']
     imgfile = opts['img']
 
     """
-    ## Initializing and compiling model
+    ## Initializing model
     """
 
     resnet50_backbone = get_backbone()
     model = RetinaNet(num_classes, resnet50_backbone)
-
-    loss_fn = RetinaNetLoss(num_classes)
-
-    learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
-        boundaries=learning_rate_boundaries, values=learning_rates
-    )
-    optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
-
-    model.compile(loss=loss_fn, optimizer=optimizer)
 
     """
     ## Loading weights
@@ -661,6 +521,15 @@ if ('img' in opts.keys()):
     model.load_weights(latest_checkpoint)
 
     """
+    ## Load the COCO2017 dataset using TensorFlow Datasets
+    """
+
+    #  set `data_dir=None` to load the complete dataset
+
+    val_dataset, dataset_info = tfds.load("coco/2017", split="validation", with_info=True, data_dir=datadir)
+    int2str = dataset_info.features["objects"]["label"].int2str
+
+    """
     ## Building inference model
     """
 
@@ -670,24 +539,35 @@ if ('img' in opts.keys()):
     inference_model = tf.keras.Model(inputs=image, outputs=detections)
 
     """
-    ## Load the COCO2017 dataset using TensorFlow Datasets
+    ## Loading image
     """
-
-    #  set `data_dir=None` to load the complete dataset
-
-    val_dataset, dataset_info = tfds.load("coco/2017", split="validation", with_info=True, data_dir=datadir)
-    int2str = dataset_info.features["objects"]["label"].int2str
 
     img = keras.preprocessing.image.load_img(imgfile)
     img_array = keras.preprocessing.image.img_to_array(img)
-
     image = tf.cast(img_array, dtype=tf.float32)
     input_image, ratio = prepare_image(image)
+
+    """
+    ## Object detection
+    """
+
     detections = inference_model.predict(input_image)
     num_detections = detections.valid_detections[0]
-    class_names = [
-        int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
-    ]
+    class_names = [ int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections] ]
+
+    """
+    ## Second classification
+    """
+
+    second_classification(
+        imgfile,
+        detections.nmsed_boxes[0][:num_detections] / ratio,
+    )
+
+    """
+    ## Visualize
+    """
+
     visualize_detections(
         image,
         detections.nmsed_boxes[0][:num_detections] / ratio,
