@@ -4,9 +4,10 @@ from tensorflow import keras
 from tensorflow.keras.models import load_model
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 import glob
 import re
-import cv2
+import os
 
 global opts
 opts = {}
@@ -20,6 +21,7 @@ def parseOptions():
     if args.img: opts.update({'img':args.img})
 
 image_size = (180, 180)
+ext = r'\.jpg$'
 
 def visualize_detections(
     image, boxes, classes, scores, figsize=(7, 7), linewidth=1, color=[1, 0, 0]
@@ -34,6 +36,27 @@ def visualize_detections(
     plt.axis("off")
     plt.imshow(image)
 
+def filter(
+     imgdir
+):
+    image_files = glob.glob(f"{imgdir}/**", recursive=True)
+
+    size = int(len(image_files))
+
+    for image_file in image_files:
+        m = re.search(ext, image_file)
+        if (m):
+            try:
+                fobj = open(image_file, "rb")
+                is_jfif = tf.compat.as_bytes("JFIF") in fobj.peek(10)
+            finally:
+                fobj.close()
+
+            if not is_jfif:
+                print(f"Error: {image_file} can not opend!")
+                # Delete corrupted image
+                os.remove(image_file)
+
 def classification(
      mdlfile, imgdir, figsize=(10, 7)
 ):
@@ -45,19 +68,19 @@ def classification(
     size = int(len(image_files))
     width = 5
     if (size < width): width = size
-    height = (size / width) + (size % width)
+    height = (size / width)
+    if (size % width): height = height + 1
     f = plt.figure(figsize=figsize)
     i = 0
 
     for image_file in image_files:
-        m = re.search(r'\.jpg$', image_file)
+        m = re.search(ext, image_file)
         if (m):
-            print(image_file)
-
             img = keras.preprocessing.image.load_img(image_file, target_size=image_size)
             img_array = keras.preprocessing.image.img_to_array(img)
             img_array = tf.expand_dims(img_array, 0)  # Create batch axis
             predictions = model.predict(img_array)
+            print(f"{image_file}:{predictions}")
 
             f.add_subplot(width, height, i + 1)
             i = i + 1
@@ -74,7 +97,5 @@ if ('mdl' in opts.keys() and 'img' in opts.keys()):
     mdlfile = opts['mdl']
     imgdir = opts['img']
 
-    classification(
-        mdlfile,
-        imgdir,
-    )
+    filter(imgdir)
+    classification(mdlfile, imgdir)
