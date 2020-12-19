@@ -68,10 +68,6 @@ val_ds = val_ds.prefetch(buffer_size=32)
 ## Train the model
 """
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("save_at_{epoch}.h5"),
-]
-
 model = load_model(opts['rmn'])
 model.summary()
 model.compile(
@@ -79,9 +75,7 @@ model.compile(
     metrics=["accuracy"],
     optimizer=keras.optimizers.Adam(1e-3),
 )
-model.fit(
-    train_ds, epochs=epochs, callbacks=callbacks, validation_data=val_ds,
-)
+model.fit(train_ds, validation_data=val_ds, epochs=epochs)
 
 """
 We get to ~96% validation accuracy after training for 50 epochs on the full dataset.
