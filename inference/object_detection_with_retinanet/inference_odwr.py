@@ -479,7 +479,7 @@ def second_classification(
 
     f.add_subplot(1, n, i + 1)
     i = i + 1
-    plt.title(777)
+    plt.title('original')
     plt.axis("off")
     plt.imshow(image)
 
