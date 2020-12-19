@@ -41,8 +41,6 @@ def filter(
 ):
     image_files = glob.glob(f"{imgdir}/**", recursive=True)
 
-    size = int(len(image_files))
-
     for image_file in image_files:
         m = re.search(ext, image_file)
         if (m):
@@ -58,7 +56,7 @@ def filter(
                 os.remove(image_file)
 
 def classification(
-     mdlfile, imgdir, figsize=(10, 7)
+     mdlfile, imgdir, figsize=(15, 9)
 ):
     model = load_model(mdlfile)
     model.summary()
@@ -84,7 +82,7 @@ def classification(
 
             f.add_subplot(width, height, i + 1)
             i = i + 1
-            plt.title(float("{:.5f}".format(predictions[0][0])))
+            plt.title(float("{:.2f}".format(predictions[0][0])))
             plt.axis("off")
             image = cv2.imread(image_file)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
