@@ -20,11 +20,13 @@ def parseOptions():
     argparser.add_argument('--dat', help=':specify data dir path') # use action='store_true' as flag
     argparser.add_argument('--mdl', help=':specify model file path') # use action='store_true' as flag
     argparser.add_argument('--img', help=':specify image file path') # use action='store_true' as flag
+    argparser.add_argument('--dbg', help=':debug option', action='store_true') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.prp: opts.update({'prp':args.prp})
     if args.dat: opts.update({'dat':args.dat})
     if args.mdl: opts.update({'mdl':args.mdl})
     if args.img: opts.update({'img':args.img})
+    if args.dbg: opts.update({'dbg':args.dbg})
 
 num_classes = 80
 learning_rate_boundaries = [125, 250, 500, 240000, 360000]
@@ -465,7 +467,7 @@ def visualize_detections(
     return ax
 
 def second_classification(
-     mdlfile, imgfile, boxes, figsize=(10, 7)
+     mdlfile, imgfile, boxes, figsize=(10, 7), linewidth=1, color=[1, 0, 0]
 ):
     model = load_model(mdlfile)
     model.summary()
@@ -473,15 +475,21 @@ def second_classification(
     image = cv2.imread(imgfile)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    n = int(len(boxes)) + 1
-    f = plt.figure(figsize=figsize)
-    i = 0
+    if ('dbg' in opts.keys()):
+        n = int(len(boxes)) + 1
+        f = plt.figure(figsize=figsize)
+        i = 0
 
-    f.add_subplot(1, n, i + 1)
-    i = i + 1
-    plt.title('original')
-    plt.axis("off")
-    plt.imshow(image)
+        f.add_subplot(1, n, i + 1)
+        i = i + 1
+        plt.title('original')
+        plt.axis("off")
+        plt.imshow(image)
+    else:
+        plt.figure(figsize=figsize)
+        plt.axis("off")
+        plt.imshow(image)
+        ax = plt.gca()
 
     for box in boxes:
 
@@ -494,18 +502,36 @@ def second_classification(
         img_array = keras.preprocessing.image.img_to_array(rimage)
         img_array = tf.expand_dims(img_array, 0)  # Create batch axis
         predictions = model.predict(img_array)
-        print(f"No.{i}:{predictions}")
 
-        f.add_subplot(1, n, i + 1)
-        i = i + 1
+        if ('dbg' in opts.keys()):
+            print(f"No.{i}:{predictions}")
+            f.add_subplot(1, n, i + 1)
+            i = i + 1
 
-        predict_max = np.amax(predictions[0])
-        predict_idx = np.argmax(predictions[0])
-        plt.title(str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]")
+            predict_max = np.amax(predictions[0])
+            predict_idx = np.argmax(predictions[0])
+            plt.title(str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]")
 
-        plt.axis("off")
-        plt.imshow(cimage)
-    
+            plt.axis("off")
+            plt.imshow(cimage)
+        else:
+            w, h = x2 - x1, y2 - y1
+            patch = plt.Rectangle(
+                [x1, y1], w, h, fill=False, edgecolor=color, linewidth=linewidth
+            )
+            ax.add_patch(patch)
+            predict_max = np.amax(predictions[0])
+            predict_idx = np.argmax(predictions[0])
+            text = str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]"
+            ax.text(
+                x1,
+                y1,
+                text,
+                bbox={"facecolor": color, "alpha": 0.4},
+                clip_box=ax.clipbox,
+                clip_on=True,
+            )
+   
     plt.show(block=True)
 
 parseOptions()
