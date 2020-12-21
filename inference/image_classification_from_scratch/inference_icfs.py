@@ -69,6 +69,7 @@ def classification(
 
             f.add_subplot(width, height, i + 1)
             i = i + 1
+
             plt.title(float("{:.2f}".format(predictions[0][0])))
             plt.axis("off")
             image = cv2.imread(image_file)

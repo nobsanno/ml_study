@@ -29,7 +29,7 @@ def parseOptions():
 num_classes = 80
 learning_rate_boundaries = [125, 250, 500, 240000, 360000]
 learning_rates = [2.5e-06, 0.000625, 0.00125, 0.0025, 0.00025, 2.5e-05]
-image_size = (180, 180)
+image_size = (150, 150)
 
 """
 ## Introduction
@@ -499,7 +499,7 @@ def second_classification(
         f.add_subplot(1, n, i + 1)
         i = i + 1
 
-        plt.title(float("{:.2f}".format(predictions[0][0])))
+        plt.title(predictions[0])
         plt.axis("off")
         plt.imshow(cimage)
     
