@@ -7,27 +7,26 @@ opts = {}
 
 def parseOptions():
     argparser = ArgumentParser()
-    argparser.add_argument('--kwd', help=':specify keyword') # use action='store_true' as flag
-    argparser.add_argument('--ctg', help=':specify category') # use action='store_true' as flag
+    argparser.add_argument('--tgt', help=':specify target want to get') # use action='store_true' as flag
+    argparser.add_argument('--knd', help=':specify kind want to get') # use action='store_true' as flag
     argparser.add_argument('--lim', help=':optional, specify limit') # use action='store_true' as flag
     args = argparser.parse_args()
-    if args.ctg: opts.update({'ctg':args.ctg})
-    if args.kwd: opts.update({'kwd':args.kwd})
+    if args.knd: opts.update({'knd':args.knd})
+    if args.tgt: opts.update({'tgt':args.tgt})
     if args.lim: opts.update({'lim':args.lim})
 
 def main(limit='10'):
-    outdir = opts['kwd']
+    outdir = opts['tgt']
     outdir = re.sub('\s', '_', outdir)
-    imgdir = opts['ctg']
+    imgdir = opts['knd']
     imgdir = re.sub('\s', '_', imgdir)
     arguments = {
-        'keywords':f"{opts['kwd']}",
+        'keywords':f"{opts['tgt']}",
         'output_directory':f"{outdir}",
-        'prefix_keywords':f"{opts['ctg']}",
+        'prefix_keywords':f"{opts['knd']}",
         'image_directory':f"{imgdir}",
         'limit':f"{limit}",
         'format':'jpg',
-        'no_numbering':True,
         'print_urls':True,
     } 
 
@@ -36,7 +35,7 @@ def main(limit='10'):
     response.download(arguments)
 
 parseOptions()
-if ('ctg' in opts.keys() and 'kwd' in opts.keys()):
+if ('tgt' in opts.keys() and 'knd' in opts.keys()):
     if ('lim' in opts.keys()):
         main(opts['lim'])
     else:
