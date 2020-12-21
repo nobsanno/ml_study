@@ -70,7 +70,10 @@ def classification(
             f.add_subplot(width, height, i + 1)
             i = i + 1
 
-            plt.title(predictions[0])
+            predict_max = np.amax(predictions[0])
+            predict_idx = np.argmax(predictions[0])
+            plt.title(str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]")
+
             plt.axis("off")
             image = cv2.imread(image_file)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

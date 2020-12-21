@@ -39,6 +39,8 @@ standardize values to be in the `[0, 1]` by using a `Rescaling` layer at the sta
 
 train_ds = tf.keras.preprocessing.image_dataset_from_directory(
     opts['img'],
+    labels='inferred',
+    label_mode='categorical',
     validation_split=0.2,
     subset="training",
     seed=1337,
@@ -48,6 +50,8 @@ train_ds = tf.keras.preprocessing.image_dataset_from_directory(
 
 val_ds = tf.keras.preprocessing.image_dataset_from_directory(
     opts['img'],
+    labels='inferred',
+    label_mode='categorical',
     validation_split=0.2,
     subset="validation",
     seed=1337,

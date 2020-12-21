@@ -9,8 +9,10 @@ opts = {}
 def parseOptions():
     argparser = ArgumentParser()
     argparser.add_argument('--wmn', help=':specify write model name') # use action='store_true' as flag
+    argparser.add_argument('--ncl', help=':specify number of class, default value is 2') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.wmn: opts.update({'wmn':args.wmn})
+    if args.ncl: opts.update({'ncl':args.ncl})
 
 image_size = (180, 180)
 
@@ -133,7 +135,10 @@ def make_model(input_shape, num_classes):
     return keras.Model(inputs, outputs)
 
 parseOptions()
-if 'wmn' in opts.keys():
-    model = make_model(input_shape=image_size + (3,), num_classes=2)
+if ('wmn' in opts.keys()):
+    num_classes = 2
+    if ('ncl' in opts.keys()):
+        num_classes = int(opts['ncl'])
+    model = make_model(input_shape=image_size + (3,), num_classes=num_classes)
     model.summary()
     model.save(opts['wmn'])
