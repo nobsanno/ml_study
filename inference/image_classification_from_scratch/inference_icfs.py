@@ -70,8 +70,8 @@ def classification(
             f.add_subplot(width, height, i + 1)
             i = i + 1
 
-            predict_max = np.amax(predictions[0][0])
-            predict_idx = np.argmax(predictions[0][0])
+            predict_max = np.amax(predictions[0])
+            predict_idx = np.argmax(predictions[0])
             plt.title(str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]")
 
             plt.axis("off")

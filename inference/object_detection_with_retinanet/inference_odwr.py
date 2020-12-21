@@ -499,7 +499,10 @@ def second_classification(
         f.add_subplot(1, n, i + 1)
         i = i + 1
 
-        plt.title(float("{:.2f}".format(predictions[0][0])))
+        predict_max = np.amax(predictions[0])
+        predict_idx = np.argmax(predictions[0])
+        plt.title(str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]")
+
         plt.axis("off")
         plt.imshow(cimage)
     
