@@ -20,21 +20,8 @@ def parseOptions():
     if args.mdl: opts.update({'mdl':args.mdl})
     if args.img: opts.update({'img':args.img})
 
-image_size = (180, 180)
+image_size = (150, 150)
 ext = r'\.jpg$'
-
-def visualize_detections(
-    image, boxes, classes, scores, figsize=(7, 7), linewidth=1, color=[1, 0, 0]
-):
-    """Visualize Detections"""
-    image = np.array(image, dtype=np.uint8)
-    plt.figure(figsize=figsize)
-
-    f.add_subplot(1, n, i + 1)
-    i = i + 1
-    plt.title('original')
-    plt.axis("off")
-    plt.imshow(image)
 
 def filter(
      imgdir
