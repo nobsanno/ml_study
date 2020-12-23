@@ -1,7 +1,9 @@
 from argparse import ArgumentParser
+import tensorflow as tf
 import cv2
 import glob
 import os
+import sys
 
 global opts
 opts = {}
@@ -40,10 +42,22 @@ def rm_min_img(imgdir, min_width=500, min_height=500):
 
     for tgt in targets:
         if (os.path.isfile(tgt)):
-            width,height,channels = get_resolution(tgt)
-            if (width < min_width or height < min_height):
-                print(f"{tgt} = {width} x {height}, so removed.")
+            try:
+                fobj = open(tgt, "rb")
+                is_jfif = tf.compat.as_bytes("JFIF") in fobj.peek(10)
+            finally:
+                fobj.close()
+
+            if not is_jfif:
+                print(f"Error: {tgt} can not opend!")
+                # Delete corrupted image
                 os.remove(tgt)
+            else:
+                width,height,channels = get_resolution(tgt)
+                if (width < min_width or height < min_height):
+                    print(f"{tgt} = {width} x {height}, so removed.")
+                    os.remove(tgt)
+
         elif (os.path.isdir(tgt)):
             if (is_empty(tgt)):
                 print(f"{tgt} is empty, so removed.")
