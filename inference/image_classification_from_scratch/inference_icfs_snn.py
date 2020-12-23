@@ -63,6 +63,7 @@ def classification(
         if (m):
             img = keras.preprocessing.image.load_img(image_file, target_size=image_size)
             img_array = keras.preprocessing.image.img_to_array(img)
+            img_array = img_array / 255.0
             img_array = tf.expand_dims(img_array, 0)  # Create batch axis
             predictions = model.predict(img_array)
             print(f"{image_file}:{predictions}")
