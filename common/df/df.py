@@ -1,20 +1,46 @@
 from argparse import ArgumentParser
+import os
 
 global opts
 opts = {}
 
 def parseOptions():
     argparser = ArgumentParser()
-    argparser.add_argument('--main', help=':main execution') # use action='store_true' as flag
+    argparser.add_argument('--img', help=':specify picture directry to database') # use action='store_true' as flag
+    argparser.add_argument('--prt', help=':only print duplicate pictures', action='store_true') # use action='store_true' as flag
+    argparser.add_argument('--mvp', help=':move all found duplicate pictures to the trash', action='store_true') # use action='store_true' as flag
+    argparser.add_argument('--shw', help=':show database', action='store_true') # use action='store_true' as flag
+    argparser.add_argument('--clr', help=':clear database', action='store_true') # use action='store_true' as flag
     args = argparser.parse_args()
-    if args.main: opts.update({'main':args.main})
+    if args.img: opts.update({'img':args.img})
+    if args.prt: opts.update({'prt':args.prt})
+    if args.mvp: opts.update({'mvp':args.mvp})
+    if args.shw: opts.update({'shw':args.shw})
+    if args.clr: opts.update({'clr':args.clr})
 
-def main():
-    infile = opts['main']
-    with open(infile) as file:
-        for line in file:
-            print(line.rstrip())
+fp = os.path.dirname(os.path.abspath(__file__))
+dfp = f"python {fp}/duplicate_finder.py"
+db = f"~/.dfdb"
+
+def img(dir):
+    os.system(f"{dfp} add {dir} --db {db}")
+
+def prt():
+    os.system(f"{dfp} find --print --db {db}")
+
+def mvp():
+    os.system(f"{dfp} find --delete --db {db}")
+
+def shw():
+    os.system(f"{dfp} show --db {db}")
+
+def clr():
+    os.system(f"{dfp} clear --db {db}")
 
 if __name__ == '__main__':
-	parseOptions()
-	if ('main' in opts.keys()): main()
+    parseOptions()
+    if ('img' in opts.keys()): img(opts['img'])
+    if ('prt' in opts.keys()): prt()
+    if ('mvp' in opts.keys()): mvp()
+    if ('shw' in opts.keys()): shw()
+    if ('clr' in opts.keys()): clr()
