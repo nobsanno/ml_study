@@ -34,9 +34,10 @@ def main(limit='10'):
     response = googleimagesdownload()
     response.download(arguments)
 
-parseOptions()
-if ('tgt' in opts.keys() and 'knd' in opts.keys()):
-    if ('lim' in opts.keys()):
-        main(opts['lim'])
-    else:
-        main()
+if __name__ == '__main__':
+    parseOptions()
+    if ('tgt' in opts.keys() and 'knd' in opts.keys()):
+        if ('lim' in opts.keys()):
+            main(opts['lim'])
+        else:
+            main()

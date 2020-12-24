@@ -63,6 +63,7 @@ def rm_min_img(imgdir, min_width=500, min_height=500):
                 print(f"{tgt} is empty, so removed.")
                 os.rmdir(tgt)
 
-parseOptions()
-if ('img' in opts.keys()):
-    rm_min_img(opts['img'])
+if __name__ == '__main__':
+    parseOptions()
+    if ('img' in opts.keys()):
+        rm_min_img(opts['img'])

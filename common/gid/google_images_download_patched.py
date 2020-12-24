@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-# In[ ]:
-#  coding: utf-8
+# clone of https://github.com/Joeclinton1/google-images-download
 
 ###### Searching and Downloading Google Images to the local disk ######
 
