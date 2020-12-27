@@ -13,14 +13,16 @@ def parseOptions():
     argparser.add_argument('--rmn', help=':specify read model name') # use action='store_true' as flag
     argparser.add_argument('--wmn', help=':specify write model name') # use action='store_true' as flag
     argparser.add_argument('--img', help=':specify image dir path') # use action='store_true' as flag
+    argparser.add_argument('--epc', help=':specify number of epoch') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.rmn: opts.update({'rmn':args.rmn})
     if args.wmn: opts.update({'wmn':args.wmn})
     if args.img: opts.update({'img':args.img})
+    if args.epc: opts.update({'epc':args.epc})
 
 IMG_SIZE = 224
-batch_size = 64
-epochs = 10
+# batch_size = 64
+batch_size = 48
 
 def plot_hist(hist):
     plt.plot(hist.history["accuracy"])
@@ -33,7 +35,7 @@ def plot_hist(hist):
 
 if __name__ == '__main__':
     parseOptions()
-    if (not ('rmn' in opts.keys() and 'wmn' in opts.keys() and 'img' in opts.keys())):
+    if (not ('rmn' in opts.keys() and 'wmn' in opts.keys() and 'img' in opts.keys() and 'epc' in opts.keys())):
         sys.exit()
 
     ds_train = tf.keras.preprocessing.image_dataset_from_directory(
@@ -58,8 +60,9 @@ if __name__ == '__main__':
         batch_size=batch_size,
     )
 
-    ds_train = ds_train.prefetch(buffer_size=32)
-    ds_test = ds_test.prefetch(buffer_size=32)
+    ds_train = ds_train.prefetch(tf.data.experimental.AUTOTUNE)
+    ds_test = ds_test.prefetch(tf.data.experimental.AUTOTUNE)
+    epochs = int(opts['epc'])
 
     model = load_model(opts['rmn'])
     model.summary()
