@@ -28,16 +28,35 @@ img_augmentation = Sequential(
     name="img_augmentation",
 )
 
-def make_model(input_shape, num_classes):
+def build_model(input_shape, num_classes):
     inputs = layers.Input(shape=input_shape)
     x = img_augmentation(inputs)
-    outputs = EfficientNetB0(include_top=True, weights=None, classes=num_classes)(x)
-    return keras.Model(inputs, outputs)
+    model = EfficientNetB0(include_top=False, input_tensor=x, weights="imagenet")
+
+    # Freeze the pretrained weights
+    model.trainable = False
+
+    # Rebuild top
+    x = layers.GlobalAveragePooling2D(name="avg_pool")(model.output)
+    x = layers.BatchNormalization()(x)
+
+    top_dropout_rate = 0.2
+    x = layers.Dropout(top_dropout_rate, name="top_dropout")(x)
+    outputs = layers.Dense(num_classes, activation="softmax", name="pred")(x)
+
+    return keras.Model(inputs, outputs, name="EfficientNet")
+
+def unfreeze_model(model):
+    # We unfreeze the top 20 layers while leaving BatchNorm layers frozen
+    for layer in model.layers[-20:]:
+        if not isinstance(layer, layers.BatchNormalization):
+            layer.trainable = True
 
 if __name__ == '__main__':
     parseOptions()
     if ('wmn' in opts.keys() and 'ncl' in opts.keys()):
         num_classes = int(opts['ncl'])
-        model = make_model(input_shape=(IMG_SIZE, IMG_SIZE, 3), num_classes=num_classes)
+        model = build_model(input_shape=(IMG_SIZE, IMG_SIZE, 3), num_classes=num_classes)
+        unfreeze_model(model)
         model.summary()
         model.save(opts['wmn'])
