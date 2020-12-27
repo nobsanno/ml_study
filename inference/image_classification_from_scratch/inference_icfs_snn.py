@@ -26,7 +26,7 @@ ext = r'\.jpg$'
 def filter(
      imgdir
 ):
-    image_files = glob.glob(f"{imgdir}/**", recursive=True)
+    image_files = glob.glob(f"{imgdir}*/**", recursive=True)
 
     for image_file in image_files:
         m = re.search(ext, image_file)

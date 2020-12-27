@@ -20,7 +20,8 @@ def parseOptions():
     if args.mdl: opts.update({'mdl':args.mdl})
     if args.img: opts.update({'img':args.img})
 
-image_size = (180, 180)
+# image_size = (180, 180)
+image_size = (224, 224)
 ext = r'\.jpg$'
 
 def filter(
@@ -48,7 +49,7 @@ def classification(
     model = load_model(mdlfile)
     model.summary()
 
-    image_files = glob.glob(f"{imgdir}/**", recursive=True)
+    image_files = glob.glob(f"{imgdir}*/**", recursive=True)
 
     size = int(len(image_files))
     width = 5
