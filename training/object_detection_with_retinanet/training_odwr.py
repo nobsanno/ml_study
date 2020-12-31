@@ -121,8 +121,8 @@ def compute_iou(boxes1, boxes2):
         jth column holds the IOU between ith box and jth box from
         boxes1 and boxes2 respectively.
     """
-    boxes1_corners = convert_to_corners(boxes1)
-    boxes2_corners = convert_to_corners(boxes2)
+    boxes1_corners = ioc.convert_to_corners(boxes1)
+    boxes2_corners = ioc.convert_to_corners(boxes2)
     lu = tf.maximum(boxes1_corners[:, None, :2], boxes2_corners[:, :2])
     rd = tf.minimum(boxes1_corners[:, None, 2:], boxes2_corners[:, 2:])
     intersection = tf.maximum(0.0, rd - lu)
@@ -157,7 +157,7 @@ class LabelEncoder:
     """
 
     def __init__(self):
-        self._anchor_box = AnchorBox()
+        self._anchor_box = ioc.AnchorBox()
         self._box_variance = tf.convert_to_tensor(
             [0.1, 0.1, 0.2, 0.2], dtype=tf.float32
         )
@@ -285,11 +285,11 @@ def preprocess_data(sample):
         shape `(num_objects,)`.
     """
     image = sample["image"]
-    bbox = swap_xy(sample["objects"]["bbox"])
+    bbox = ioc.swap_xy(sample["objects"]["bbox"])
     class_id = tf.cast(sample["objects"]["label"], dtype=tf.int32)
 
     image, bbox = random_flip_horizontal(image, bbox)
-    image, image_shape, _ = resize_and_pad_image(image)
+    image, image_shape, _ = ioc.resize_and_pad_image(image)
 
     bbox = tf.stack(
         [
@@ -300,28 +300,28 @@ def preprocess_data(sample):
         ],
         axis=-1,
     )
-    bbox = convert_to_xywh(bbox)
+    bbox = ioc.convert_to_xywh(bbox)
     return image, bbox, class_id
 
 """
 ## Initializing and compiling model
 """
 
-resnet50_backbone = ioc.get_backbone()
-model = ioc.RetinaNet(num_classes, resnet50_backbone)
-
-loss_fn = RetinaNetLoss(num_classes)
-
-learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
-    boundaries=learning_rate_boundaries, values=learning_rates
-)
-optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
-
-model.compile(loss=loss_fn, optimizer=optimizer)
-
 if __name__ == '__main__':
     parseOptions()
     if ('trg' in opts.keys()):
+        resnet50_backbone = ioc.get_backbone()
+        model = ioc.RetinaNet(num_classes, resnet50_backbone)
+
+        loss_fn = RetinaNetLoss(num_classes)
+
+        learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
+            boundaries=learning_rate_boundaries, values=learning_rates
+        )
+        optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
+
+        model.compile(loss=loss_fn, optimizer=optimizer)
+
         """
         ## Load the COCO2017 dataset using TensorFlow Datasets
         """
