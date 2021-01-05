@@ -327,6 +327,7 @@ if __name__ == '__main__':
         """
 
         # set `data_dir=None` to load the complete dataset
+        # tfds.load return the type of tf.data.Dataset
         (train_dataset, val_dataset), dataset_info = tfds.load(
             "coco/2017", split=["train", "validation"], with_info=True, data_dir=weights_dir
         )
@@ -351,14 +352,13 @@ if __name__ == '__main__':
         """
 
         autotune = tf.data.experimental.AUTOTUNE
+
         train_dataset = train_dataset.map(preprocess_data, num_parallel_calls=autotune)
         train_dataset = train_dataset.shuffle(8 * batch_size)
         train_dataset = train_dataset.padded_batch(
             batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True
         )
-        train_dataset = train_dataset.map(
-            label_encoder.encode_batch, num_parallel_calls=autotune
-        )
+        train_dataset = train_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
         train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
         train_dataset = train_dataset.prefetch(autotune)
 

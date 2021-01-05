@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 import tensorflow as tf
 from tensorflow import keras
 import tensorflow_datasets as tfds
+import cv2
 import inference_odwr_com as ioc
 
 global opts
@@ -9,16 +10,20 @@ opts = {}
 
 def parseOptions():
     argparser = ArgumentParser()
-    argparser.add_argument('--dwn', help=':downloading data set', action='store_true') # use action='store_true' as flag
+    argparser.add_argument('--dwn', help=':preparing data set', action='store_true') # use action='store_true' as flag
     argparser.add_argument('--dat', help=':specify data dir path') # use action='store_true' as flag
     argparser.add_argument('--mdl', help=':specify model file path') # use action='store_true' as flag
-    argparser.add_argument('--img', help=':specify image file path') # use action='store_true' as flag
+    argparser.add_argument('--img', help=':specify image file path, mov option is precedenced') # use action='store_true' as flag
+    argparser.add_argument('--mov', help=':specify movie file path') # use action='store_true' as flag
+    argparser.add_argument('--sfn', help=':specify start frame number, default=0') # use action='store_true' as flag
     argparser.add_argument('--dbg', help=':debug option', action='store_true') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.dwn: opts.update({'dwn':args.dwn})
     if args.dat: opts.update({'dat':args.dat})
     if args.mdl: opts.update({'mdl':args.mdl})
     if args.img: opts.update({'img':args.img})
+    if args.mov: opts.update({'mov':args.mov})
+    if args.sfn: opts.update({'sfn':args.sfn})
     if args.dbg: opts.update({'dbg':args.dbg})
 
 num_classes = 80
@@ -29,10 +34,14 @@ if __name__ == '__main__':
     if ('dwn' in opts.keys()):
         ioc.down_coco2017_ds()
 
-    if ('dat' in opts.keys() and 'mdl' in opts.keys() and 'img' in opts.keys()):
+    if ('dat' in opts.keys() and 'mdl' in opts.keys() and ('img' in opts.keys() or 'mov' in opts.keys())):
         datadir = opts['dat']
         mdlfile = opts['mdl']
-        imgfile = opts['img']
+        if ('img' in opts.keys()): imgfile = opts['img']
+        movfile = False
+        if ('mov' in opts.keys()): movfile = opts['mov']
+        if ('sfn' in opts.keys()): startframe = int(opts['sfn'])
+        else: startframe = 0
         dbgopt = False
         if ('dbg' in opts.keys()): dbgopt = True
 
@@ -50,27 +59,54 @@ if __name__ == '__main__':
         detections = ioc.DecodePredictions(confidence_threshold=0.5)(image, predictions)
         inference_model = tf.keras.Model(inputs=image, outputs=detections)
 
-        img = keras.preprocessing.image.load_img(imgfile)
-        img_array = keras.preprocessing.image.img_to_array(img)
-        image = tf.cast(img_array, dtype=tf.float32)
-        input_image, ratio = ioc.prepare_image(image)
+        if (movfile):
+            cap = cv2.VideoCapture(movfile)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, startframe)
 
-        detections = inference_model.predict(input_image)
-        num_detections = detections.valid_detections[0]
-        class_names = [ int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections] ]
+        count = 0
+        flimit = 10
+        while True:
+            if (movfile):
+                print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)) +
+                      ", msec=" + str(cap.get(cv2.CAP_PROP_POS_MSEC)))
+                ret, img_array = cap.read()
+                if (count > flimit): ret = False
+                simg = img_array
+                frame_coun = count + 1
+            else:
+                if (count == 0): ret = True
+                else: ret = False
+                fimg = keras.preprocessing.image.load_img(imgfile)
+                img_array = keras.preprocessing.image.img_to_array(fimg)
+                simg = cv2.imread(imgfile)
+                frame_coun = 0
+            
+            if ret == True:
+                image = tf.cast(img_array, dtype=tf.float32)
+                input_image, ratio = ioc.prepare_image(image)
 
-        if (dbgopt):
-            ioc.visualize_detections(
-                image,
-                detections.nmsed_boxes[0][:num_detections] / ratio,
-                class_names,
-                detections.nmsed_scores[0][:num_detections],
-            )
+                detections = inference_model.predict(input_image)
+                num_detections = detections.valid_detections[0]
+                class_names = [ int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections] ]
 
-        ioc.second_classification(
-            mdlfile,
-            imgfile,
-            image_size,
-            detections.nmsed_boxes[0][:num_detections] / ratio,
-            dbg=dbgopt,
-        )
+                if (dbgopt):
+                    ioc.visualize_detections(
+                        image,
+                        detections.nmsed_boxes[0][:num_detections] / ratio,
+                        class_names,
+                        detections.nmsed_scores[0][:num_detections],
+                    )
+
+                ioc.second_classification(
+                    mdlfile,
+                    simg,
+                    image_size,
+                    detections.nmsed_boxes[0][:num_detections] / ratio,
+                    fc=frame_coun,
+                    dbg=dbgopt,
+                    div=False,
+                )
+            else:
+                break
+            
+            count = count + 1

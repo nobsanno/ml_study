@@ -456,17 +456,17 @@ def visualize_detections(
     return ax
 
 def second_classification(
-     mdlfile, imgfile, image_size, boxes, div=False, dbg=False, figsize=(10, 7), linewidth=1, color=[1, 0, 0]
+     mdlfile, cv2image, image_size, boxes, fc=1, dbg=False, div=False, figsize=(10, 7), linewidth=1, color=[1, 0, 0]
 ):
     model = load_model(mdlfile)
     model.summary()
 
-    image = cv2.imread(imgfile)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
 
+    if (fc > 0 and fc != 1): plt.close()
     if (dbg):
-        n = int(len(boxes)) + 1
         f = plt.figure(figsize=figsize)
+        n = int(len(boxes)) + 1
         i = 0
 
         f.add_subplot(1, n, i + 1)
@@ -522,4 +522,7 @@ def second_classification(
                 clip_on=True,
             )
    
-    plt.show(block=True)
+    if (fc > 0):
+        plt.pause(1)
+    else:
+        plt.show(block=True)
