@@ -1,5 +1,7 @@
-
 #■データの整形と学習データの作成
+
+#Pythonの画像処理ライブラリPIL（Python Imaging Library）
+#以下のように画像ファイルを指定し、Imageクラスのオブジェクトを作成
 
 from PIL import Image 
 import os, glob
@@ -11,7 +13,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 classes = ["dog", "cat", "giraffe", "elephant", "lion"]
 num_classes = len(classes)#リストや文字列など様々な型のオブジェクトのサイズ（要素数や文字数）を取得
 image_size = 150
-num_testdata = 500
+num_testdata = 300
 
 X_train = []
 X_test  = []
@@ -40,10 +42,9 @@ for index, classlabel in enumerate(classes):
 
             # angleに代入される値
             # -20
-            # -5
-            # 10
-            # 画像を15度ずつ回転
-            for angle in range(-20, 20, 15):
+            # 0
+            # 画像を20度ずつ回転
+            for angle in range(-20, 20, 20):
 
                 img_r = image.rotate(angle)
                 data = np.asarray(img_r)
@@ -66,14 +67,17 @@ xy = (X_train, X_test, y_train, y_test)
 np.save("./dog_cat_giraffe_elephant_lion.npy", xy)
 
 
-
-#■モデル作成
-
+#■ネットワークの作成
 import tensorflow as tf
 from keras import layers
 from keras import models
 from keras import optimizers
+from keras.layers import Activation, Dropout, Flatten, Dense
 from keras.utils import np_utils
+from keras.layers.normalization import BatchNormalization
+import matplotlib.pyplot as plt
+%matplotlib inline
+
 
 classes = ["dog", "cat", "giraffe", "elephant", "lion"]
 num_classes = len(classes)
@@ -94,26 +98,31 @@ def load_data():
 
     return X_train, y_train, X_test, y_test
 
-"""
-モデルを学習する関数
-"""
 def train(X_train, y_train, X_test, y_test):
     model = tf.keras.models.Sequential()
 
 
     #畳み込み層(Convolution layer) ニューロン数32, 3*3のフィルターを使用
-    model.add(layers.Conv2D(32,(3,3),activation="relu",input_shape=X_train.shape[1:]))
+    model.add(layers.Conv2D(32,(3,3),padding='same',input_shape=X_train.shape[1:]))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
 
     #プーリング層　縮小対象の領域は2×2
     model.add(layers.MaxPooling2D((2,2))) #（ダウンサンプリング）
 
-    model.add(layers.Conv2D(64,(3,3),activation="relu"))
+    model.add(layers.Conv2D(64,(3,3)))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
     model.add(layers.MaxPooling2D((2,2)))
 
-    model.add(layers.Conv2D(128,(3,3),activation="relu"))
+    model.add(layers.Conv2D(128,(3,3)))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
     model.add(layers.MaxPooling2D((2,2)))
 
-    model.add(layers.Conv2D(128,(3,3),activation="relu"))
+    model.add(layers.Conv2D(128,(3,3)))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
     model.add(layers.MaxPooling2D((2,2)))
 
     #flatten層
@@ -123,24 +132,52 @@ def train(X_train, y_train, X_test, y_test):
     model.add(layers.Dropout(0.5))
 
     #全結合層 Fully connected layer
-    model.add(layers.Dense(512,activation="relu"))
+    model.add(layers.Dense(512))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
 
     #出力層
     model.add(layers.Dense(num_classes,activation="softmax"))
 
-    model.compile(loss="categorical_crossentropy",
-                 optimizer="adam",
+    model.compile(loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
+                 optimizer=optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False),
                  metrics=["acc"])
-    model.fit(X_train, y_train,#画像とラベルデータ
-              batch_size=25,
-              epochs=30,
-              validation_data=(X_test, y_test),
-              shuffle=True)
-    model.save('./cats_dogs_giraffes_elephants_lions_classification2.h5')
+    history =model.fit(X_train, y_train,#画像とラベルデータ
+                 batch_size=128,
+                 epochs=30,
+                 validation_data=(X_test, y_test),
+                 shuffle=True)
+    model.save('./cats_dogs_giraffes_elephants_lions_classification.h5')
+
+    model.summary()
+
+    acc = history.history["acc"]
+    val_acc = history.history["val_acc"]
+    loss = history.history["loss"]
+    val_loss = history.history["val_loss"]
+
+    epochs = range(1,len(acc) + 1)
+
+    plt.plot(epochs, acc,"bo",label="Training Acc")
+    plt.plot(epochs, val_acc,"b",label="Validation Acc")
+    plt.legend()
+
+    plt.figure()
+
+    plt.plot(epochs,loss,"bo",label="Training Loss")
+    plt.plot(epochs,val_loss,"b",label="Validation Loss")
+    plt.legend()
+
+    plt.show()
+
+    return model
 
 
-#■メイン関数
-#データの読み込みとモデルの学習を実行。
+
+"""
+メイン関数
+データの読み込みとモデルの学習を行います。
+"""
 
 # データの読み込み
 X_train, y_train, X_test, y_test = load_data()
