@@ -28,6 +28,7 @@ def parseOptions():
 
 num_classes = 80
 image_size = (180, 180)
+divopt = False
 
 if __name__ == '__main__':
     parseOptions()
@@ -68,7 +69,7 @@ if __name__ == '__main__':
         while True:
             if (movfile):
                 print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)) +
-                      ", msec=" + str(cap.get(cv2.CAP_PROP_POS_MSEC)))
+                      ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
                 ret, img_array = cap.read()
                 if (count > flimit): ret = False
                 simg = img_array
@@ -104,7 +105,7 @@ if __name__ == '__main__':
                     detections.nmsed_boxes[0][:num_detections] / ratio,
                     fc=frame_coun,
                     dbg=dbgopt,
-                    div=False,
+                    div=divopt,
                 )
             else:
                 break

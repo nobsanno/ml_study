@@ -463,9 +463,9 @@ def second_classification(
 
     image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
 
-    if (fc > 0 and fc != 1): plt.close()
+    if (fc >= 2): plt.close()
+    f = plt.figure(figsize=figsize)
     if (dbg):
-        f = plt.figure(figsize=figsize)
         n = int(len(boxes)) + 1
         i = 0
 
@@ -475,7 +475,6 @@ def second_classification(
         plt.axis("off")
         plt.imshow(image)
     else:
-        plt.figure(figsize=figsize)
         plt.axis("off")
         plt.imshow(image)
         ax = plt.gca()
@@ -522,7 +521,7 @@ def second_classification(
                 clip_on=True,
             )
    
-    if (fc > 0):
+    if (fc >= 1):
         plt.pause(1)
     else:
         plt.show(block=True)
