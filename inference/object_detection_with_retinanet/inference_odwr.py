@@ -16,7 +16,7 @@ def parseOptions():
     argparser.add_argument('--img', help=':specify image file path, mov option is precedenced') # use action='store_true' as flag
     argparser.add_argument('--mov', help=':specify movie file path') # use action='store_true' as flag
     argparser.add_argument('--sfn', help=':specify start frame number, default=0') # use action='store_true' as flag
-    argparser.add_argument('--flm', help=':specify frame number limit, default=3') # use action='store_true' as flag
+    argparser.add_argument('--ofs', help=':specify output frame size, default=3') # use action='store_true' as flag
     argparser.add_argument('--dbg', help=':debug option', action='store_true') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.dwn: opts.update({'dwn':args.dwn})
@@ -25,7 +25,7 @@ def parseOptions():
     if args.img: opts.update({'img':args.img})
     if args.mov: opts.update({'mov':args.mov})
     if args.sfn: opts.update({'sfn':args.sfn})
-    if args.flm: opts.update({'flm':args.flm})
+    if args.ofs: opts.update({'ofs':args.ofs})
     if args.dbg: opts.update({'dbg':args.dbg})
 
 num_classes = 80
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
         if ('sfn' in opts.keys()): startframe = int(opts['sfn'])
         else: startframe = 0
-        if ('flm' in opts.keys()): startframe = int(opts['flm'])
+        if ('ofs' in opts.keys()): startframe = int(opts['ofs'])
         else: framelimit = 3
         
         if ('dbg' in opts.keys()): dbgopt = True
