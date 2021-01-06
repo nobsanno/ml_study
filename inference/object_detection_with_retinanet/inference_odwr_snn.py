@@ -16,6 +16,7 @@ def parseOptions():
     argparser.add_argument('--img', help=':specify image file path, mov option is precedenced') # use action='store_true' as flag
     argparser.add_argument('--mov', help=':specify movie file path') # use action='store_true' as flag
     argparser.add_argument('--sfn', help=':specify start frame number, default=0') # use action='store_true' as flag
+    argparser.add_argument('--flm', help=':specify frame number limit, default=3') # use action='store_true' as flag
     argparser.add_argument('--dbg', help=':debug option', action='store_true') # use action='store_true' as flag
     args = argparser.parse_args()
     if args.dwn: opts.update({'dwn':args.dwn})
@@ -24,6 +25,7 @@ def parseOptions():
     if args.img: opts.update({'img':args.img})
     if args.mov: opts.update({'mov':args.mov})
     if args.sfn: opts.update({'sfn':args.sfn})
+    if args.flm: opts.update({'flm':args.flm})
     if args.dbg: opts.update({'dbg':args.dbg})
 
 num_classes = 80
@@ -38,13 +40,18 @@ if __name__ == '__main__':
     if ('dat' in opts.keys() and 'mdl' in opts.keys() and ('img' in opts.keys() or 'mov' in opts.keys())):
         datadir = opts['dat']
         mdlfile = opts['mdl']
+
         if ('img' in opts.keys()): imgfile = opts['img']
-        movfile = False
         if ('mov' in opts.keys()): movfile = opts['mov']
+        else: movfile = False
+
         if ('sfn' in opts.keys()): startframe = int(opts['sfn'])
         else: startframe = 0
-        dbgopt = False
+        if ('flm' in opts.keys()): startframe = int(opts['flm'])
+        else: framelimit = 3
+        
         if ('dbg' in opts.keys()): dbgopt = True
+        else: dbgopt = False
 
         resnet50_backbone = ioc.get_backbone()
         model = ioc.RetinaNet(num_classes, resnet50_backbone)
@@ -65,13 +72,12 @@ if __name__ == '__main__':
             cap.set(cv2.CAP_PROP_POS_FRAMES, startframe)
 
         count = 0
-        flimit = 10
         while True:
             if (movfile):
                 print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)) +
                       ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
                 ret, img_array = cap.read()
-                if (count > flimit): ret = False
+                if (count > framelimit): ret = False
                 simg = img_array
                 frame_coun = count + 1
             else:
