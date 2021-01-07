@@ -527,7 +527,7 @@ def second_classification(
         plt.show(block=True)
 
 def second_classification_to_vs(
-     mdlfile, cv2image, image_size, boxes, fc=0, div=False
+     mdlfile, cv2image, image_size, boxes, fp=0, div=False
 ):
     model = load_model(mdlfile)
     # model.summary()
@@ -538,7 +538,8 @@ def second_classification_to_vs(
         # bb-box
         x1, y1, x2, y2 = [int(idx) for idx in box]
         # print(f"x1={x1}, x2={x2}, y1={y1}, y2={y2}")
-        # w, h = x2 - x1, y2 - y1
+        if (x1 < 0): x1 = 0
+        if (y1 < 0): y1 = 0
 
         # image classification by nobu-net
         cimage = image[y1:y2, x1:x2]
@@ -556,9 +557,9 @@ def second_classification_to_vs(
 
         # over-ray to original image
         cv2.rectangle(cv2image, (x1, y1), (x2, y2), (0, 0, 255))
-        cv2.putText(cv2image, text, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
+        cv2.putText(cv2image, text, (x1+10, y1+30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
 
-    cv2.putText(cv2image, 'f='+str(fc), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
+    cv2.putText(cv2image, 'f='+str(fp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
     cv2.imshow('animal detection', cv2image)
-    if cv2.waitKey(1) & ord('q') == 0xFF:
+    if (cv2.waitKey(1) & ord('q') == 0xFF):
         exit

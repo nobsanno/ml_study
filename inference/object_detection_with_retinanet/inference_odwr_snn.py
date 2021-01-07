@@ -61,6 +61,7 @@ if __name__ == '__main__':
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
         count = 0
+        frame_skip = 14
         while True:
             ret, img_array = cap.read()
             if (count > frame_size): ret = False
@@ -80,10 +81,11 @@ if __name__ == '__main__':
                     img_array,
                     image_size,
                     detections.nmsed_boxes[0][:num_detections] / ratio,
-                    fc=(start_frame + count),
+                    fp=(cap.get(cv2.CAP_PROP_POS_FRAMES)-1),
                     div=divopt,
                 )
             else:
                 break
             
             count = count + 1
+            cap.set(cv2.CAP_PROP_POS_FRAMES, (cap.get(cv2.CAP_PROP_POS_FRAMES)+frame_skip))
