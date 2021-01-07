@@ -459,7 +459,7 @@ def second_classification(
      mdlfile, cv2image, image_size, boxes, fc=1, dbg=False, div=False, figsize=(10, 7), linewidth=1, color=[1, 0, 0]
 ):
     model = load_model(mdlfile)
-    model.summary()
+    # model.summary()
 
     image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
 
@@ -525,3 +525,40 @@ def second_classification(
         plt.pause(1)
     else:
         plt.show(block=True)
+
+def second_classification_to_vs(
+     mdlfile, cv2image, image_size, boxes, fc=0, div=False
+):
+    model = load_model(mdlfile)
+    # model.summary()
+
+    image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
+
+    for box in boxes:
+        # bb-box
+        x1, y1, x2, y2 = [int(idx) for idx in box]
+        # print(f"x1={x1}, x2={x2}, y1={y1}, y2={y2}")
+        # w, h = x2 - x1, y2 - y1
+
+        # image classification by nobu-net
+        cimage = image[y1:y2, x1:x2]
+        rimage = cv2.resize(cimage, image_size)
+
+        img_array = keras.preprocessing.image.img_to_array(rimage)
+        if (div):
+            img_array = img_array / 255.0
+        img_array = tf.expand_dims(img_array, 0)  # Create batch axis
+        predictions = model.predict(img_array)
+
+        predict_max = np.amax(predictions[0])
+        predict_idx = np.argmax(predictions[0])
+        text = str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]"
+
+        # over-ray to original image
+        cv2.rectangle(cv2image, (x1, y1), (x2, y2), (0, 0, 255))
+        cv2.putText(cv2image, text, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
+
+    cv2.putText(cv2image, 'f='+str(fc), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
+    cv2.imshow('animal detection', cv2image)
+    if cv2.waitKey(1) & ord('q') == 0xFF:
+        exit

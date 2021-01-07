@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
         if ('sfn' in opts.keys()): start_frame = int(opts['sfn'])
         else: start_frame = 0
-        if ('ofs' in opts.keys()): start_frame = int(opts['ofs'])
+        if ('ofs' in opts.keys()): frame_size = int(opts['ofs'])
         else: frame_size = 3
         
         resnet50_backbone = ioc.get_backbone()
@@ -62,12 +62,12 @@ if __name__ == '__main__':
 
         count = 0
         while True:
-            print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)) +
-                  ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
             ret, img_array = cap.read()
             if (count > frame_size): ret = False
             
             if ret == True:
+                print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)-1) +
+                      ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
                 image = tf.cast(img_array, dtype=tf.float32)
                 input_image, ratio = ioc.prepare_image(image)
 
@@ -75,13 +75,12 @@ if __name__ == '__main__':
                 num_detections = detections.valid_detections[0]
                 class_names = [ int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections] ]
 
-                ioc.second_classification(
+                ioc.second_classification_to_vs(
                     mdlfile,
                     img_array,
                     image_size,
                     detections.nmsed_boxes[0][:num_detections] / ratio,
-                    fc=(count + 1),
-                    dbg=False,
+                    fc=(start_frame + count),
                     div=divopt,
                 )
             else:

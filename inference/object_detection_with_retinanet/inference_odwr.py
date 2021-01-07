@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
         if ('sfn' in opts.keys()): start_frame = int(opts['sfn'])
         else: start_frame = 0
-        if ('ofs' in opts.keys()): start_frame = int(opts['ofs'])
+        if ('ofs' in opts.keys()): frame_size = int(opts['ofs'])
         else: frame_size = 3
         
         if ('dbg' in opts.keys()): dbgopt = True
@@ -74,8 +74,6 @@ if __name__ == '__main__':
         count = 0
         while True:
             if (movfile):
-                print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)) +
-                      ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
                 ret, img_array = cap.read()
                 if (count > frame_size): ret = False
                 simg = img_array
@@ -89,6 +87,9 @@ if __name__ == '__main__':
                 frame_coun = 0
             
             if ret == True:
+                if (movfile):
+                    print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)-1) +
+                          ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
                 image = tf.cast(img_array, dtype=tf.float32)
                 input_image, ratio = ioc.prepare_image(image)
 
