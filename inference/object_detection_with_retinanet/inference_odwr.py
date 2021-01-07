@@ -45,10 +45,10 @@ if __name__ == '__main__':
         if ('mov' in opts.keys()): movfile = opts['mov']
         else: movfile = False
 
-        if ('sfn' in opts.keys()): startframe = int(opts['sfn'])
-        else: startframe = 0
-        if ('ofs' in opts.keys()): startframe = int(opts['ofs'])
-        else: framelimit = 3
+        if ('sfn' in opts.keys()): start_frame = int(opts['sfn'])
+        else: start_frame = 0
+        if ('ofs' in opts.keys()): start_frame = int(opts['ofs'])
+        else: frame_size = 3
         
         if ('dbg' in opts.keys()): dbgopt = True
         else: dbgopt = False
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
         if (movfile):
             cap = cv2.VideoCapture(movfile)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, startframe)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
         count = 0
         while True:
@@ -77,7 +77,7 @@ if __name__ == '__main__':
                 print("frame=" + str(cap.get(cv2.CAP_PROP_POS_FRAMES)) +
                       ", sec=" + str((cap.get(cv2.CAP_PROP_POS_MSEC)/1000)))
                 ret, img_array = cap.read()
-                if (count > framelimit): ret = False
+                if (count > frame_size): ret = False
                 simg = img_array
                 frame_coun = count + 1
             else:
