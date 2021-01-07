@@ -527,7 +527,7 @@ def second_classification(
         plt.show(block=True)
 
 def second_classification_to_vs(
-     mdlfile, cv2image, image_size, boxes, fp=0, div=False
+     mdlfile, cv2image, image_size, boxes, classes, fp=0, div=False
 ):
     model = load_model(mdlfile)
     # model.summary()
@@ -535,7 +535,7 @@ def second_classification_to_vs(
     image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
 
     for box in boxes:
-        # bb-box
+        # bbox adress
         x1, y1, x2, y2 = [int(idx) for idx in box]
         # print(f"x1={x1}, x2={x2}, y1={y1}, y2={y2}")
         if (x1 < 0): x1 = 0
@@ -553,7 +553,8 @@ def second_classification_to_vs(
 
         predict_max = np.amax(predictions[0])
         predict_idx = np.argmax(predictions[0])
-        text = str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]"
+        # text = str(float("{:.2f}".format(predict_max))) + f"[{predict_idx}]"
+        text = f"{classes[predict_idx]}:" + str(float("{:.2f}".format(predict_max)))
 
         # over-ray to original image
         cv2.rectangle(cv2image, (x1, y1), (x2, y2), (0, 0, 255))
