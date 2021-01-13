@@ -527,12 +527,13 @@ def second_classification(
         plt.show(block=True)
 
 def second_classification_to_vs(
-     mdlfile, cv2image, image_size, boxes, classes, fp=0, div=False
+     mdlfile, cv2image, image_size, boxes, classes, fn=0, fps=30, div=False
 ):
     model = load_model(mdlfile)
     # model.summary()
 
     image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
+    color = (0, 0, 255)
 
     for box in boxes:
         # bbox adress
@@ -557,10 +558,9 @@ def second_classification_to_vs(
         text = f"{classes[predict_idx]}:" + str(float("{:.2f}".format(predict_max)))
 
         # over-ray to original image
-        cv2.rectangle(cv2image, (x1, y1), (x2, y2), (0, 0, 255))
-        cv2.putText(cv2image, text, (x1+10, y1+30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
+        cv2.rectangle(cv2image, (x1, y1), (x2, y2), color)
+        cv2.putText(cv2image, text, (x1+10, y1+30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, thickness=2)
 
-    cv2.putText(cv2image, 'f='+str(fp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), thickness=2)
+    cv2.putText(cv2image, 'fn='+str(fn)+' fps='+str(fps), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, thickness=2)
     cv2.imshow('animal detection', cv2image)
-    if (cv2.waitKey(1) & ord('q') == 0xFF):
-        exit
+    cv2.waitKey(1)

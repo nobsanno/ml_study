@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow_datasets as tfds
 import cv2
+import time
 import inference_odwr_com as ioc
 
 global opts
@@ -28,7 +29,6 @@ num_classes = 80
 image_size = (150, 150)
 divopt = True
 classes = ["dog", "cat", "giraffe", "elephant", "lion"]
-frame_skip = 14
 
 if __name__ == '__main__':
     parseOptions()
@@ -63,7 +63,9 @@ if __name__ == '__main__':
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
         count = 0
+        frame_skip = 0
         while True:
+            t1 = time.time() 
             ret, img_array = cap.read()
             if (count > frame_size): ret = False
             
@@ -83,11 +85,15 @@ if __name__ == '__main__':
                     image_size,
                     detections.nmsed_boxes[0][:num_detections] / ratio,
                     classes,
-                    fp=(cap.get(cv2.CAP_PROP_POS_FRAMES)-1),
+                    fn=(cap.get(cv2.CAP_PROP_POS_FRAMES)-1),
+                    fps=(30/(frame_skip+1)),
                     div=divopt,
                 )
             else:
                 break
             
             count = count + 1
+            t2 = time.time()
+            elapsed_time = t2 - t1
+            frame_skip = int((elapsed_time/10)*30)
             cap.set(cv2.CAP_PROP_POS_FRAMES, (cap.get(cv2.CAP_PROP_POS_FRAMES)+frame_skip))
